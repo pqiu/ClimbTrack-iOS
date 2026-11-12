@@ -391,5 +391,4 @@ nonisolated final class MultiScaleTrackingCoordinator: @unchecked Sendable {
 /// overlays are selected independently on the Recording Output tuning page.
 nonisolated enum TrackingDebugConfiguration {
     static let showsScreenOverlays = true
-    static let showsMotorControlOverlay = true
 }

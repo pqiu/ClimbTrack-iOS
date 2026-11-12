@@ -32,18 +32,10 @@ struct RecordingOutputTuningView: View {
                 }
             }
 
-            Section("Timing Clarification") {
-                Text("Every selected format is written while recording, so Stop only finalizes and saves the files. Modes 1 and 2 are written at approximately 8 Hz. Modes 3 and 4 retain camera-frequency frames, and Mode 4 interpolates its crop on every frame. At least one mode must remain selected.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             Section {
                 Button("Restore Default Recording Modes") {
                     tuning.resetRecordingOutputModes()
                 }
-            } footer: {
-                Text("Mode 4 is the only default selection. Multiple outputs increase processing, battery use, heat, and temporary storage while recording.")
             }
         }
         .navigationTitle("Recording Output")
@@ -63,10 +55,6 @@ struct ZoomTuningView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-
-                Text("Changes apply live to the next processed tracking frame and persist between app launches.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Section("Hysteresis Control") {
@@ -153,8 +141,6 @@ struct ZoomTuningView: View {
                 Button("Restore Zoom Defaults") {
                     tuning.resetZoomDefaults()
                 }
-            } footer: {
-                Text("This milestone keeps the existing Vision-driven crop cadence; it does not add camera-frame-rate interpolation.")
             }
         }
         .navigationTitle("Zoom Tuning")
@@ -179,7 +165,7 @@ struct TrackingTuningView: View {
 
     var body: some View {
         Form {
-            Section("Model Backends") {
+            Section("Detection and Tracking Models") {
                 Picker("Person detection", selection: $tuning.detectionBackend) {
                     ForEach(PersonDetectionBackend.selectableCases, id: \.self) { backend in
                         Text(backend.displayName).tag(backend)
@@ -188,56 +174,7 @@ struct TrackingTuningView: View {
 
                 LabeledContent("Identity matching", value: "Apple Feature Print")
 
-                Text("The three YOLOX models provide bounding boxes and use the same tracking pipeline as Apple Vision. YOLOX-Nano is smallest and fastest, YOLOX-Tiny balances speed and accuracy, and YOLOX-S is the largest and most accurate YOLOX option. Apple Vision + Skeleton keeps the Apple person boxes and adds pose-assisted aiming. Identity matching uses Apple Feature Print. If a bundled model cannot load, the app safely falls back to Apple Vision.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Skeleton-Assisted Aiming") {
-                tuningSlider(
-                    "Minimum joint confidence",
-                    value: $tuning.poseMinimumJointConfidence,
-                    range: 0.05...0.80,
-                    step: 0.05,
-                    format: decimal2
-                )
-                tuningSlider(
-                    "Torso smoothing",
-                    value: $tuning.torsoAnchorSmoothing,
-                    range: 0.05...1.00,
-                    step: 0.05,
-                    format: decimal2
-                )
-                tuningSlider(
-                    "Maximum aim-point step",
-                    value: $tuning.maximumTorsoAnchorStepPercent,
-                    range: 2...40,
-                    step: 1,
-                    format: percent
-                )
-
-                Text("Used only in Apple Vision + Skeleton mode. Smoothing is the fraction of each new torso position applied per Vision update. Maximum step is measured as a percentage of the displayed crop. If a reliable torso is unavailable, aiming falls back smoothly to the box center. Zoom still uses box size.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Apparent-Scale Rejection") {
-                tuningSlider(
-                    "Suspicious size ratio",
-                    value: $tuning.suspiciousScaleRatio,
-                    range: 1.5...6.0,
-                    step: 0.25,
-                    format: ratio
-                )
-                tuningSlider(
-                    "Reject size ratio",
-                    value: $tuning.rejectionScaleRatio,
-                    range: 2.0...8.0,
-                    step: 0.25,
-                    format: ratio
-                )
-
-                Text("Used only in Apple Vision + Skeleton mode. A candidate larger than the suspicious ratio must pass an immediate identity check. A candidate larger than the reject ratio cannot take the target lock. The scale estimate uses articulated torso/leg length when available, otherwise a verified full-body height. Similar size is neutral—not proof of identity.")
+                Text("YOLOX-Nano, YOLOX-Tiny, YOLOX-S, and Apple Vision show person bounding boxes. Apple Vision + Skeleton shows person bounding boxes and a body skeleton.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -272,9 +209,6 @@ struct TrackingTuningView: View {
                     format: percent
                 )
 
-                Text("The identity threshold applies to the gallery match. The two total thresholds apply to the combined association score, depending on whether an identity sample was available for that frame. Center jump is the Euclidean box-center movement as a percentage of the displayed crop. Candidates beyond this hard gate remain detected people but cannot become the red target. Box size and aspect ratio are not part of this gate.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Section("Reacquisition") {
@@ -300,7 +234,53 @@ struct TrackingTuningView: View {
                     format: wholeNumber
                 )
 
-                Text("The threshold is the required gallery identity match. The margin requires the best candidate to beat the runner-up. Confirmation frames are positive, mutually consistent observations before pan–tilt can resume.")
+            }
+
+            Section("Skeleton-Assisted Aiming") {
+                tuningSlider(
+                    "Minimum joint confidence",
+                    value: $tuning.poseMinimumJointConfidence,
+                    range: 0.05...0.80,
+                    step: 0.05,
+                    format: decimal2
+                )
+                tuningSlider(
+                    "Torso smoothing",
+                    value: $tuning.torsoAnchorSmoothing,
+                    range: 0.05...1.00,
+                    step: 0.05,
+                    format: decimal2
+                )
+                tuningSlider(
+                    "Maximum aim-point step",
+                    value: $tuning.maximumTorsoAnchorStepPercent,
+                    range: 2...40,
+                    step: 1,
+                    format: percent
+                )
+
+                Text("Used only in Apple Vision + Skeleton.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Apparent-Scale Rejection") {
+                tuningSlider(
+                    "Suspicious size ratio",
+                    value: $tuning.suspiciousScaleRatio,
+                    range: 1.5...6.0,
+                    step: 0.25,
+                    format: ratio
+                )
+                tuningSlider(
+                    "Reject size ratio",
+                    value: $tuning.rejectionScaleRatio,
+                    range: 2.0...8.0,
+                    step: 0.25,
+                    format: ratio
+                )
+
+                Text("Used only in Apple Vision + Skeleton.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -487,9 +467,6 @@ struct PanTiltTuningView: View {
                     step: 0.01,
                     format: seconds
                 )
-                Text("Motor movement stops when this time passes without a reliable tracking observation that still requests movement.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 tuningSlider(
                     "Stable observations",
                     value: $tuning.requiredStableObservationCount,
@@ -503,8 +480,6 @@ struct PanTiltTuningView: View {
                 Button("Restore Pan–Tilt Defaults") {
                     tuning.resetPanTiltDefaults()
                 }
-            } footer: {
-                Text("Changes apply live. During automatic tracking, minimum and maximum motor speeds are divided by the current digital zoom. Manual aiming uses its separate fixed speed.")
             }
         }
         .navigationTitle("Pan–Tilt Tuning")

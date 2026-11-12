@@ -65,6 +65,7 @@ struct BLEDeviceManagementView: View {
                 devicesSection
 
                 developerControlsSection
+                informationSection
                 openSourceSection
 
                 if manager.preferredPeripheralIdentifier != nil {
@@ -248,6 +249,34 @@ struct BLEDeviceManagementView: View {
         }
     }
 
+    private var informationSection: some View {
+        Section("Information") {
+            Link(
+                destination: URL(
+                    string: "https://pqiu.github.io/ClimbTrack-iOS/privacy.html"
+                )!
+            ) {
+                Label("Privacy Policy", systemImage: "hand.raised")
+            }
+
+            Link(
+                destination: URL(
+                    string: "https://pqiu.github.io/ClimbTrack-iOS/support.html"
+                )!
+            ) {
+                Label("Support", systemImage: "questionmark.circle")
+            }
+
+            Link(
+                destination: URL(
+                    string: "https://pqiu.github.io/ClimbTrack-iOS/safety.html"
+                )!
+            ) {
+                Label("Safety Guidance", systemImage: "exclamationmark.shield")
+            }
+        }
+    }
+
     private var openSourceSection: some View {
         Section("Open Source") {
             Link(
@@ -257,9 +286,9 @@ struct BLEDeviceManagementView: View {
             }
 
             Link(
-                destination: URL(string: "https://www.gnu.org/licenses/agpl-3.0.html")!
+                destination: URL(string: "https://www.apache.org/licenses/LICENSE-2.0")!
             ) {
-                Label("GNU AGPL v3 License", systemImage: "doc.text")
+                Label("Apache License 2.0", systemImage: "doc.text")
             }
 
             Link(
@@ -270,7 +299,7 @@ struct BLEDeviceManagementView: View {
                 Label("Third-Party Notices", systemImage: "doc.text.magnifyingglass")
             }
 
-            Text("ClimbTrack is free software licensed under the GNU Affero General Public License v3.0. It is provided without warranty.")
+            Text("ClimbTrack is open-source software licensed under the Apache License 2.0. It is provided without warranty.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

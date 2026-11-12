@@ -212,7 +212,7 @@ nonisolated final class RecordingVariantExporter: @unchecked Sendable {
         let current = metadata[index]
         let crop: CGRect
         switch mode {
-        case .debugZoomedTracking:
+        case .zoomedTracking:
             crop = TrackingGeometry.clipped(current.frame.trackingMetadata.displayCrop)
         case .smoothZoomedClean:
             if index + 1 < metadata.count {
@@ -229,8 +229,6 @@ nonisolated final class RecordingVariantExporter: @unchecked Sendable {
             } else {
                 crop = TrackingGeometry.clipped(current.frame.trackingMetadata.displayCrop)
             }
-        case .fullFramePeopleBoxes, .fullFrameClean:
-            crop = TrackingGeometry.unitRectangle
         }
         return FrameSelection(
             frame: current.frame,
@@ -282,7 +280,7 @@ nonisolated final class RecordingVariantExporter: @unchecked Sendable {
         )
 
         switch mode {
-        case .debugZoomedTracking:
+        case .zoomedTracking:
             drawDebugOverlay(
                 frame,
                 gestureStatus: gestureStatus,
@@ -291,9 +289,7 @@ nonisolated final class RecordingVariantExporter: @unchecked Sendable {
                 into: destination,
                 outputSize: outputSize
             )
-        case .fullFramePeopleBoxes:
-            drawPeopleBoxes(frame, displayCrop: crop, into: destination, outputSize: outputSize)
-        case .fullFrameClean, .smoothZoomedClean:
+        case .smoothZoomedClean:
             break
         }
     }
@@ -356,6 +352,21 @@ nonisolated final class RecordingVariantExporter: @unchecked Sendable {
                         color.setStroke()
                         path.stroke()
                     }
+                    let jointRadius = max(3, outputSize.width / 390 * 3)
+                    for joint in skeleton.joints.values {
+                        guard let point = outputPoint(
+                            for: joint.location,
+                            displayCrop: displayCrop,
+                            outputSize: outputSize
+                        ) else { continue }
+                        color.setFill()
+                        UIBezierPath(ovalIn: CGRect(
+                            x: point.x - jointRadius,
+                            y: point.y - jointRadius,
+                            width: jointRadius * 2,
+                            height: jointRadius * 2
+                        )).fill()
+                    }
                 }
             }
             if frame.trackingMetadata.analysisRegion != TrackingGeometry.unitRectangle,
@@ -374,30 +385,6 @@ nonisolated final class RecordingVariantExporter: @unchecked Sendable {
                ) {
                 stroke(rectangle, color: .systemOrange, width: 8, dash: [18, 12])
             }
-            let target = frame.targetPresentation
-            let lines = [
-                "\(frame.trackingMetadata.analysisMode.rawValue)  "
-                    + String(format: "ZOOM %.1fx", frame.trackingMetadata.zoomFactor),
-                target?.statusText,
-                target?.galleryDiagnosticText,
-                target?.galleryUpdateDiagnostic?.scoreText,
-                target?.galleryUpdateDiagnostic?.gateText,
-                target?.galleryUpdateDiagnostic?.result,
-                target?.scaleDiagnosticText,
-                gestureStatus?.displayText,
-                gestureDiagnosticText
-            ].compactMap { $0 }
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineSpacing = 3
-            (lines.joined(separator: "\n") as NSString).draw(
-                in: CGRect(x: 24, y: 32, width: outputSize.width - 48, height: 330),
-                withAttributes: [
-                    .font: UIFont.monospacedSystemFont(ofSize: 30, weight: .bold),
-                    .foregroundColor: UIColor.white,
-                    .backgroundColor: UIColor.black.withAlphaComponent(0.62),
-                    .paragraphStyle: paragraph
-                ]
-            )
         }
     }
 

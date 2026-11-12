@@ -127,18 +127,6 @@ final class RecordingManager: NSObject, ObservableObject {
         selectedOutputModes = modes
     }
 
-    func updateGestureDiagnostics(status: GestureStatus?, diagnosticText: String?) {
-        for pipeline in pipelines.values {
-            pipeline.updateGestureDiagnostics(status: status, diagnosticText: diagnosticText)
-        }
-    }
-
-    func updateMotorControlDiagnostics(_ snapshot: AutomaticPanTiltRecordingSnapshot) {
-        for pipeline in pipelines.values {
-            pipeline.updateMotorControlDiagnostics(snapshot)
-        }
-    }
-
     func startRecording() {
         guard canStartRecording else { return }
 
@@ -421,17 +409,6 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
         let crop: CGRect
     }
 
-    private struct DebugTextLine {
-        let text: String
-        let color: UIColor
-    }
-
-    private enum DebugPanelAlignment {
-        case leading
-        case center
-        case trailing
-    }
-
     let queue: DispatchQueue
     var onRecordingStarted: (@Sendable () -> Void)?
 
@@ -444,9 +421,6 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
     private var audioEnabled = true
     private var outputSize = CGSize.zero
     private var latestTrackingFrame = PersonDetectionFrame.empty
-    private var latestGestureStatus: GestureStatus?
-    private var latestGestureDiagnosticText: String?
-    private var latestMotorControlSnapshot = AutomaticPanTiltRecordingSnapshot.inactive
     private var outputMode: RecordingOutputMode
     private var previousSmoothCropKeyframe: CropKeyframe?
     private var unbracketedSmoothFrames: [BufferedVideoFrame] = []
@@ -499,24 +473,6 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
             } else {
                 previousSmoothCropKeyframe = nil
             }
-        }
-    }
-
-    nonisolated func updateGestureDiagnostics(
-        status: GestureStatus?,
-        diagnosticText: String?
-    ) {
-        queue.async { [weak self] in
-            self?.latestGestureStatus = status
-            self?.latestGestureDiagnosticText = diagnosticText
-        }
-    }
-
-    nonisolated func updateMotorControlDiagnostics(
-        _ snapshot: AutomaticPanTiltRecordingSnapshot
-    ) {
-        queue.async { [weak self] in
-            self?.latestMotorControlSnapshot = snapshot
         }
     }
 
@@ -686,7 +642,7 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
             return
         }
 
-        let crop = outputMode == .debugZoomedTracking
+        let crop = outputMode == .zoomedTracking
             ? TrackingGeometry.clipped(latestTrackingFrame.trackingMetadata.displayCrop)
             : TrackingGeometry.unitRectangle
         if outputMode.usesEightHertzFrames,
@@ -864,11 +820,9 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
         )
 
         switch mode {
-        case .debugZoomedTracking:
+        case .zoomedTracking:
             drawDebugOverlay(frame, displayCrop: crop, into: destination)
-        case .fullFramePeopleBoxes:
-            drawPeopleBoxes(frame, displayCrop: crop, into: destination)
-        case .fullFrameClean, .smoothZoomedClean:
+        case .smoothZoomedClean:
             break
         }
     }
@@ -947,15 +901,6 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
         }
 
         let interfaceScale = max(1, outputSize.width / 390)
-        if latestMotorControlSnapshot.isSessionActive {
-            drawMotorControlGeometry(
-                latestMotorControlSnapshot,
-                frame: frame,
-                displayCrop: displayCrop,
-                interfaceScale: interfaceScale
-            )
-        }
-
         for detection in frame.detections {
             guard let rectangle = outputRectangle(
                 for: detection.normalizedBoundingBox,
@@ -978,7 +923,25 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
                     color.setStroke()
                     path.stroke()
                 }
+                for joint in skeleton.joints.values {
+                    guard let point = outputPoint(
+                        for: joint.location,
+                        displayCrop: displayCrop
+                    ) else { continue }
+                    fillCircle(
+                        at: point,
+                        radius: 3 * interfaceScale,
+                        color: color
+                    )
+                }
             }
+            drawDetectionLabel(
+                detection,
+                isTarget: isTarget,
+                color: color,
+                rectangle: rectangle,
+                interfaceScale: interfaceScale
+            )
         }
 
         if frame.trackingMetadata.analysisRegion != TrackingGeometry.unitRectangle,
@@ -997,205 +960,48 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
             stroke(rectangle, color: .systemOrange, width: 8, dash: [18, 12])
         }
 
-        let target = frame.targetPresentation
-        drawDebugTextPanel(
-            lines: [DebugTextLine(
-                text: "\(frame.trackingMetadata.analysisMode.rawValue) · "
-                    + String(format: "%.1f×", frame.trackingMetadata.zoomFactor),
-                color: .cyan
-            )],
-            top: 38 * interfaceScale,
-            alignment: .leading,
-            fontSize: 11 * interfaceScale,
-            interfaceScale: interfaceScale
-        )
-        if latestMotorControlSnapshot.isSessionActive {
-            drawDebugTextPanel(
-                lines: [DebugTextLine(
-                    text: latestMotorControlSnapshot.cameraName,
-                    color: .cyan
-                )],
-                top: 38 * interfaceScale,
-                alignment: .trailing,
-                fontSize: 11 * interfaceScale,
-                interfaceScale: interfaceScale
-            )
-        }
-
-        var nextTop = 70 * interfaceScale
-
-        if let gestureText = latestGestureStatus?.displayText ?? latestGestureDiagnosticText {
-            nextTop = drawDebugTextPanel(
-                lines: [DebugTextLine(
-                    text: gestureText,
-                    color: latestGestureStatus == nil ? .systemYellow : .white
-                )],
-                top: nextTop,
-                alignment: .center,
-                fontSize: 11 * interfaceScale,
-                interfaceScale: interfaceScale
-            ) + 8 * interfaceScale
-        }
-
-        if let target {
-            var galleryLines = [DebugTextLine(
-                text: target.galleryDiagnosticText,
-                color: .white
-            )]
-            if let diagnostic = target.galleryUpdateDiagnostic {
-                galleryLines.append(DebugTextLine(text: diagnostic.scoreText, color: .white))
-                galleryLines.append(DebugTextLine(text: diagnostic.gateText, color: .white))
-                galleryLines.append(DebugTextLine(
-                    text: diagnostic.result,
-                    color: diagnostic.result.hasPrefix("ADDED") ? .systemGreen : .systemYellow
-                ))
-            }
-            if let scale = target.scaleDiagnosticText {
-                galleryLines.append(DebugTextLine(text: scale, color: .cyan))
-            }
-            nextTop = drawDebugTextPanel(
-                lines: galleryLines,
-                top: nextTop,
-                alignment: .center,
-                fontSize: 11 * interfaceScale,
-                interfaceScale: interfaceScale
-            ) + 8 * interfaceScale
-        }
-
-        if let target, let status = target.statusText {
-            var lines = [DebugTextLine(text: status, color: .white)]
-            if let reason = target.statusReasonText {
-                lines.append(DebugTextLine(text: reason, color: .systemYellow))
-            }
-            drawDebugTextPanel(
-                lines: lines,
-                top: nextTop + 14 * interfaceScale,
-                alignment: .center,
-                fontSize: 11 * interfaceScale,
-                interfaceScale: interfaceScale,
-                cornerRadius: 12 * interfaceScale
-            )
-        }
-
     }
 
-    private func drawMotorControlGeometry(
-        _ snapshot: AutomaticPanTiltRecordingSnapshot,
-        frame: PersonDetectionFrame,
-        displayCrop: CGRect,
+    private func drawDetectionLabel(
+        _ detection: PersonDetection,
+        isTarget: Bool,
+        color: UIColor,
+        rectangle: CGRect,
         interfaceScale: CGFloat
     ) {
-        let intendedCenter = CGPoint(
-            x: displayCrop.midX + displayCrop.width * snapshot.horizontalTargetOffset,
-            y: displayCrop.midY + displayCrop.height * snapshot.verticalTargetOffset
+        let confidence = Int(detection.confidence * 100)
+        let text = isTarget
+            ? "TARGET · \(detection.source.rawValue) \(confidence)%"
+            : "\(detection.source.rawValue) \(confidence)%"
+        let font = UIFont.monospacedSystemFont(
+            ofSize: 10 * interfaceScale,
+            weight: .semibold
         )
-        for (horizontal, vertical, color, dash) in [
-            (
-                snapshot.horizontalOuterThreshold,
-                snapshot.verticalOuterThreshold,
-                UIColor.systemOrange,
-                [CGFloat(7), CGFloat(5)]
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.black
+        ]
+        let textSize = (text as NSString).size(withAttributes: attributes)
+        let horizontalPadding = 4 * interfaceScale
+        let verticalPadding = 2 * interfaceScale
+        let panel = CGRect(
+            x: rectangle.minX,
+            y: rectangle.minY,
+            width: min(
+                outputSize.width - rectangle.minX,
+                textSize.width + horizontalPadding * 2
             ),
-            (
-                snapshot.horizontalInnerThreshold,
-                snapshot.verticalInnerThreshold,
-                UIColor.systemGreen,
-                [CGFloat(4), CGFloat(4)]
-            )
-        ] {
-            let canonical = CGRect(
-                x: intendedCenter.x - displayCrop.width * horizontal,
-                y: intendedCenter.y - displayCrop.height * vertical,
-                width: displayCrop.width * horizontal * 2,
-                height: displayCrop.height * vertical * 2
-            )
-            if let rectangle = outputRectangle(
-                for: canonical,
-                displayCrop: displayCrop
-            ) {
-                stroke(
-                    rectangle,
-                    color: color,
-                    width: 2 * interfaceScale,
-                    dash: dash.map { $0 * interfaceScale }
-                )
-            }
-        }
-
-        let cropCenter = CGPoint(x: displayCrop.midX, y: displayCrop.midY)
-        if let point = outputPoint(for: cropCenter, displayCrop: displayCrop) {
-            fillCircle(at: point, radius: 4 * interfaceScale, color: .cyan)
-        }
-        if let point = outputPoint(for: intendedCenter, displayCrop: displayCrop) {
-            strokeCircle(
-                at: point,
-                radius: 6 * interfaceScale,
-                color: .systemPurple,
-                width: 2 * interfaceScale
-            )
-        }
-        if let box = frame.trackingMetadata.canonicalTargetBox,
-           let point = outputPoint(
-            for: CGPoint(x: box.midX, y: box.midY),
-            displayCrop: displayCrop
-           ) {
-            fillCircle(at: point, radius: 5 * interfaceScale, color: .systemRed)
-        }
-    }
-
-    @discardableResult
-    private func drawDebugTextPanel(
-        lines: [DebugTextLine],
-        top: CGFloat,
-        alignment: DebugPanelAlignment,
-        fontSize: CGFloat,
-        interfaceScale: CGFloat,
-        cornerRadius: CGFloat? = nil
-    ) -> CGFloat {
-        guard !lines.isEmpty else { return top }
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        paragraph.lineSpacing = 3 * interfaceScale
-        let font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
-        let attributed = NSMutableAttributedString()
-        for (index, line) in lines.enumerated() {
-            if index > 0 { attributed.append(NSAttributedString(string: "\n")) }
-            attributed.append(NSAttributedString(
-                string: line.text,
-                attributes: [
-                    .font: font,
-                    .foregroundColor: line.color,
-                    .paragraphStyle: paragraph
-                ]
-            ))
-        }
-        let horizontalPadding = 10 * interfaceScale
-        let verticalPadding = 7 * interfaceScale
-        let maximumTextWidth = outputSize.width - 48 * interfaceScale
-        let textBounds = attributed.boundingRect(
-            with: CGSize(width: maximumTextWidth, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
-        ).integral
-        let panelSize = CGSize(
-            width: min(outputSize.width - 16 * interfaceScale, textBounds.width + horizontalPadding * 2),
-            height: textBounds.height + verticalPadding * 2
+            height: textSize.height + verticalPadding * 2
         )
-        let x: CGFloat = switch alignment {
-        case .leading: 8 * interfaceScale
-        case .center: (outputSize.width - panelSize.width) / 2
-        case .trailing: outputSize.width - panelSize.width - 8 * interfaceScale
-        }
-        let panel = CGRect(x: x, y: top, width: panelSize.width, height: panelSize.height)
-        UIColor.black.withAlphaComponent(0.72).setFill()
-        UIBezierPath(
-            roundedRect: panel,
-            cornerRadius: cornerRadius ?? 8 * interfaceScale
-        ).fill()
-        attributed.draw(
-            in: panel.insetBy(dx: horizontalPadding, dy: verticalPadding)
+        color.withAlphaComponent(0.9).setFill()
+        UIBezierPath(rect: panel).fill()
+        (text as NSString).draw(
+            at: CGPoint(
+                x: panel.minX + horizontalPadding,
+                y: panel.minY + verticalPadding
+            ),
+            withAttributes: attributes
         )
-        return panel.maxY
     }
 
     private func fillCircle(at point: CGPoint, radius: CGFloat, color: UIColor) {
@@ -1206,23 +1012,6 @@ private final class RecordingPipeline: NSObject, @unchecked Sendable {
             width: radius * 2,
             height: radius * 2
         )).fill()
-    }
-
-    private func strokeCircle(
-        at point: CGPoint,
-        radius: CGFloat,
-        color: UIColor,
-        width: CGFloat
-    ) {
-        let path = UIBezierPath(ovalIn: CGRect(
-            x: point.x - radius,
-            y: point.y - radius,
-            width: radius * 2,
-            height: radius * 2
-        ))
-        path.lineWidth = width
-        color.setStroke()
-        path.stroke()
     }
 
     private func outputRectangle(

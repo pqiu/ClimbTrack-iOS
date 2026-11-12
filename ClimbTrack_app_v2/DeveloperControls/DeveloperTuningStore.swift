@@ -15,47 +15,37 @@ nonisolated enum ZoomControlMode: String, CaseIterable, Sendable {
 }
 
 nonisolated enum RecordingOutputMode: String, CaseIterable, Sendable {
-    case debugZoomedTracking
-    case fullFramePeopleBoxes
-    case fullFrameClean
+    case zoomedTracking
     case smoothZoomedClean
 
     var displayName: String {
         switch self {
-        case .debugZoomedTracking: "1 · Zoomed + Full Debug"
-        case .fullFramePeopleBoxes: "2 · Full Frame + Person Boxes"
-        case .fullFrameClean: "3 · Full Frame + Clean"
-        case .smoothZoomedClean: "4 · Smooth Zoomed + Clean"
+        case .zoomedTracking: "1 · Zoomed + Tracking"
+        case .smoothZoomedClean: "4 · Zoomed"
         }
     }
 
     var detail: String {
         switch self {
-        case .debugZoomedTracking:
-            "Current behavior: tracking crop and all diagnostics update with Vision results."
-        case .fullFramePeopleBoxes:
-            "Full camera view with red target and green detected-person boxes; boxes update with Vision results."
-        case .fullFrameClean:
-            "Full camera view at camera frame rate with no boxes or diagnostics."
+        case .zoomedTracking:
+            "Zoomed video with the same tracking overlays shown during the live recording session."
         case .smoothZoomedClean:
-            "Zoomed view with the crop interpolated on every camera frame and no overlays."
+            "Smooth zoomed video without tracking overlays."
         }
     }
 
     var fileNameComponent: String {
         switch self {
-        case .debugZoomedTracking: "Debug-Zoomed"
-        case .fullFramePeopleBoxes: "Full-People"
-        case .fullFrameClean: "Full-Clean"
+        case .zoomedTracking: "Zoomed-Tracking"
         case .smoothZoomedClean: "Zoomed-Clean"
         }
     }
 
     var usesEightHertzFrames: Bool {
         switch self {
-        case .debugZoomedTracking, .fullFramePeopleBoxes:
+        case .zoomedTracking:
             true
-        case .fullFrameClean, .smoothZoomedClean:
+        case .smoothZoomedClean:
             false
         }
     }
@@ -370,11 +360,23 @@ final class DeveloperTuningStore: ObservableObject {
         ))
         zoomMode = userDefaults.string(forKey: Key.zoomMode)
             .flatMap(ZoomControlMode.init(rawValue:)) ?? Defaults.zoomMode
-        let savedModes = userDefaults.stringArray(forKey: Key.recordingOutputModes)?
-            .compactMap(RecordingOutputMode.init(rawValue:)) ?? []
-        let migratedMode = userDefaults.string(forKey: Key.recordingOutputMode)
-            .flatMap(RecordingOutputMode.init(rawValue:)) ?? Defaults.recordingOutputMode
-        recordingOutputModes = savedModes.isEmpty ? [migratedMode] : Set(savedModes)
+        let migratedModeRawValue = userDefaults.string(forKey: Key.recordingOutputMode)
+        let migratedMode = migratedModeRawValue == "debugZoomedTracking"
+            ? RecordingOutputMode.zoomedTracking
+            : migratedModeRawValue.flatMap(RecordingOutputMode.init(rawValue:))
+                ?? Defaults.recordingOutputMode
+        if let persistedModes = userDefaults.stringArray(forKey: Key.recordingOutputModes) {
+            let validModes = persistedModes.compactMap { rawValue in
+                rawValue == "debugZoomedTracking"
+                    ? RecordingOutputMode.zoomedTracking
+                    : RecordingOutputMode(rawValue: rawValue)
+            }
+            recordingOutputModes = validModes.isEmpty
+                ? [Defaults.recordingOutputMode]
+                : Set(validModes)
+        } else {
+            recordingOutputModes = [migratedMode]
+        }
         hysteresisTargetPercent = Self.double(userDefaults, Key.hysteresisTarget, Defaults.hysteresisTarget)
         zoomInTriggerPercent = Self.double(userDefaults, Key.zoomInTrigger, Defaults.zoomInTrigger)
         zoomOutTriggerPercent = Self.double(userDefaults, Key.zoomOutTrigger, Defaults.zoomOutTrigger)

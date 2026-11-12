@@ -135,9 +135,9 @@ currently distributed under the repository license below.
 Copyright 2026 Peng Qiu
 
 ClimbTrack is free software licensed under the
-[GNU Affero General Public License v3.0](LICENSE). You may use, study, modify,
-and redistribute it—including commercially—subject to the license terms. It is
-provided without warranty.
+[Apache License 2.0](LICENSE). You may use, study, modify, and redistribute it,
+including commercially, subject to the license terms. It is provided without
+warranty.
 
 The license does not grant permission to use the ClimbTrack name or visual
 identity in a way that implies endorsement. See [TRADEMARKS.md](TRADEMARKS.md).

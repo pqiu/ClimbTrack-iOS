@@ -118,52 +118,6 @@ enum AutomaticMotorCommandKind: Sendable {
     case stop
 }
 
-nonisolated struct AutomaticPanTiltRecordingSnapshot: Sendable {
-    let isSessionActive: Bool
-    let cameraName: String
-    let horizontalInnerThreshold: CGFloat
-    let verticalInnerThreshold: CGFloat
-    let horizontalOuterThreshold: CGFloat
-    let verticalOuterThreshold: CGFloat
-    let horizontalTargetOffset: CGFloat
-    let verticalTargetOffset: CGFloat
-    let targetHorizontalOffset: CGFloat
-    let targetVerticalOffset: CGFloat
-    let commandSequence: Int
-    let lastCommandKind: AutomaticMotorCommandKind
-    let lastCommandPanSpeed: Int
-    let lastCommandTiltSpeed: Int
-    let lastCommandTargetHorizontalOffset: CGFloat
-    let lastCommandTargetVerticalOffset: CGFloat
-    let lastCommandHorizontalError: CGFloat
-    let lastCommandVerticalError: CGFloat
-    let bleWriteDiagnosticText: String
-    let deviceAcknowledgementDiagnosticText: String
-
-    static let inactive = Self(
-        isSessionActive: false,
-        cameraName: "BACK CAMERA",
-        horizontalInnerThreshold: 0,
-        verticalInnerThreshold: 0,
-        horizontalOuterThreshold: 0,
-        verticalOuterThreshold: 0,
-        horizontalTargetOffset: 0,
-        verticalTargetOffset: 0,
-        targetHorizontalOffset: 0,
-        targetVerticalOffset: 0,
-        commandSequence: 0,
-        lastCommandKind: .none,
-        lastCommandPanSpeed: 0,
-        lastCommandTiltSpeed: 0,
-        lastCommandTargetHorizontalOffset: 0,
-        lastCommandTargetVerticalOffset: 0,
-        lastCommandHorizontalError: 0,
-        lastCommandVerticalError: 0,
-        bleWriteDiagnosticText: "BLE WRITE · NONE",
-        deviceAcknowledgementDiagnosticText: "MCU ACK · NONE"
-    )
-}
-
 struct CameraMotorDirectionMapping: Sendable {
     let panSign: Int
     let tiltSign: Int
@@ -253,32 +207,6 @@ final class AutomaticPanTiltController: ObservableObject {
     var suspensionReason: AutomaticPanTiltSuspensionReason? {
         guard case .suspended(let reason) = state else { return nil }
         return reason
-    }
-
-    var recordingDebugSnapshot: AutomaticPanTiltRecordingSnapshot {
-        let configuration = configuration
-        return AutomaticPanTiltRecordingSnapshot(
-            isSessionActive: isSessionActive,
-            cameraName: cameraPosition == .front ? "FRONT CAMERA" : "BACK CAMERA",
-            horizontalInnerThreshold: configuration.horizontalInnerThreshold,
-            verticalInnerThreshold: configuration.verticalInnerThreshold,
-            horizontalOuterThreshold: configuration.horizontalOuterThreshold,
-            verticalOuterThreshold: configuration.verticalOuterThreshold,
-            horizontalTargetOffset: configuration.horizontalTargetOffset,
-            verticalTargetOffset: configuration.verticalTargetOffset,
-            targetHorizontalOffset: normalizedTargetHorizontalOffset,
-            targetVerticalOffset: normalizedTargetVerticalOffset,
-            commandSequence: commandSequence,
-            lastCommandKind: lastCommandKind,
-            lastCommandPanSpeed: lastCommandPanSpeed,
-            lastCommandTiltSpeed: lastCommandTiltSpeed,
-            lastCommandTargetHorizontalOffset: lastCommandTargetHorizontalOffset,
-            lastCommandTargetVerticalOffset: lastCommandTargetVerticalOffset,
-            lastCommandHorizontalError: lastCommandHorizontalError,
-            lastCommandVerticalError: lastCommandVerticalError,
-            bleWriteDiagnosticText: bleWriteDiagnosticText,
-            deviceAcknowledgementDiagnosticText: deviceAcknowledgementDiagnosticText
-        )
     }
 
     func startSession(cameraPosition: AVCaptureDevice.Position) {

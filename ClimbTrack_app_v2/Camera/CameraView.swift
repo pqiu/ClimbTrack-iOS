@@ -90,14 +90,6 @@ struct CameraView: View {
             )
                 .ignoresSafeArea()
 
-            if TrackingDebugConfiguration.showsMotorControlOverlay {
-                AutomaticPanTiltDebugOverlay(
-                    controller: automaticPanTiltController,
-                    frame: humanDetectionService.latestFrame
-                )
-                .ignoresSafeArea()
-            }
-
             if let gestureConfirmationMessage {
                 Text(gestureConfirmationMessage)
                     .font(.headline.weight(.bold))
@@ -183,17 +175,9 @@ struct CameraView: View {
                 target: humanDetectionService.currentTarget
             )
             recordingManager.updateTrackingFrame(frame)
-            recordingManager.updateMotorControlDiagnostics(
-                automaticPanTiltController.recordingDebugSnapshot
-            )
         }
         .onChange(of: automaticPanTiltController.isMotorMoving) { _, isMoving in
             updateCameraMotionState()
-        }
-        .onChange(of: automaticPanTiltController.commandSequence) { _, _ in
-            recordingManager.updateMotorControlDiagnostics(
-                automaticPanTiltController.recordingDebugSnapshot
-            )
         }
         .onChange(of: idleAimController.isMotorMoving) { _, isMoving in
             updateCameraMotionState()
@@ -224,18 +208,6 @@ struct CameraView: View {
         }
         .onChange(of: developerTuning.recordingOutputModes) { _, modes in
             recordingManager.updateRecordingOutputModes(modes)
-        }
-        .onReceive(humanDetectionService.$gestureStatus) { status in
-            recordingManager.updateGestureDiagnostics(
-                status: status,
-                diagnosticText: humanDetectionService.gestureDiagnosticText
-            )
-        }
-        .onReceive(humanDetectionService.$gestureDiagnosticText) { diagnosticText in
-            recordingManager.updateGestureDiagnostics(
-                status: humanDetectionService.gestureStatus,
-                diagnosticText: diagnosticText
-            )
         }
         .onChange(of: scenePhase) { _, newPhase in
             updateIdleTimer(for: newPhase)

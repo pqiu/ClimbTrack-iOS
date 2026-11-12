@@ -1,6 +1,6 @@
 # Trademarks
 
-The GNU AGPL v3 license governs the ClimbTrack software distribution in this
+The Apache License 2.0 governs the ClimbTrack software distribution in this
 repository. It does not grant permission to use the ClimbTrack name, app icon,
 logo, or other source-identifying marks in a way that suggests sponsorship,
 endorsement, or an official release.

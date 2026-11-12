@@ -53,11 +53,11 @@ accessible power cutoff.
 A model contribution must include its source, exact version or checkpoint,
 license, conversion procedure, input/output contract, checksums, and known
 limitations. Update both the third-party notices and model card. Do not add a
-model whose license is incompatible with AGPL-3.0 distribution.
+model whose license is incompatible with Apache-2.0 distribution.
 
 ## Contribution license
 
 By submitting a contribution, you certify that you have the right to submit it
-and agree that it may be distributed under the repository's GNU AGPL v3 license.
-You retain copyright in your contribution. The project does not request
-copyright assignment through this document.
+and agree that it may be distributed under the repository's Apache License 2.0.
+You retain copyright in your contribution. The project does not request copyright
+assignment through this document.
