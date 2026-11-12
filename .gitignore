@@ -1,0 +1,13 @@
+.DS_Store
+build/
+DerivedData/
+*.ipa
+*.dSYM
+*.dSYM.zip
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+*.xcresult
+.xcode.env.local
+
